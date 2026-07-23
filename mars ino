@@ -1,0 +1,130 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ThingSpeak.h>
+#include <LittleFS.h>
+#include <DHT.h> // Library untuk Sensor DHT21
+
+// ================= KONFIGURASI =================
+const char* ssid = "NAMA_WIFI_ANDA";              // Ganti dengan nama WiFi Anda
+const char* password = "PASSWORD_WIFI_ANDA";      // Ganti dengan password WiFi Anda
+
+unsigned long myChannelNumber = 1234567;          // Ganti dengan Channel ID ThingSpeak Anda
+const char* myWriteAPIKey = "WRITE_API_KEY_ANDA"; // Ganti dengan Write API Key ThingSpeak Anda
+// ===============================================
+
+// Konfigurasi Pin Sensor & Aktuator
+#define DHTPIN 14       // Pin Data DHT21 terhubung ke Pin 14 Wemos32
+#define DHTTYPE DHT21   // Jenis Sensor (DHT21 / AM2301)
+const int pinSoil = 32; // Pin Analog untuk Sensor Kelembaban Tanah
+
+const int pinPompa = 26; // Aktuator 1 (Pompa)
+const int pinKipas = 27; // Aktuator 2 (Kipas)
+
+DHT dht(DHTPIN, DHTTYPE);
+WiFiClient client;
+WebServer server(80);
+
+unsigned long lastTime = 0;
+unsigned long timerDelay = 15000; // Kirim data tiap 15 detik (sesuai limit ThingSpeak)
+
+void setup() {
+  Serial.begin(115200);
+  
+  // Setup Pin Aktuator
+  pinMode(pinPompa, OUTPUT);
+  pinMode(pinKipas, OUTPUT);
+  digitalWrite(pinPompa, LOW); // Posisi awal mati
+  digitalWrite(pinKipas, LOW); // Posisi awal mati
+
+  // Mulai pembacaan Sensor DHT
+  dht.begin();
+
+  // 1. Mount LittleFS (Membaca memori internal Wemos32)
+  if (!LittleFS.begin(true)) {
+    Serial.println("Gagal Mount LittleFS! Pastikan Anda sudah melakukan 'ESP32 Sketch Data Upload'.");
+    return;
+  }
+  Serial.println("LittleFS Berhasil Di-mount.");
+
+  // 2. Hubungkan ke WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Menghubungkan ke WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nTerhubung! Buka IP ini di Browser:");
+  Serial.println(WiFi.localIP()); // Ini IP yang harus diketik di browser
+
+  // 3. Mulai koneksi ke ThingSpeak
+  ThingSpeak.begin(client);
+
+  // 4. Setup Routing WebServer untuk LittleFS
+  // Ini akan otomatis mencari file index.html, style.css, dan script.js di dalam LittleFS
+  server.serveStatic("/", LittleFS, "/");
+
+  // Endpoint untuk menerima perintah kendali Aktuator dari website
+  server.on("/actuator", HTTP_GET, []() {
+    if (server.hasArg("id") && server.hasArg("state")) {
+      String id = server.arg("id");
+      String state = server.arg("state");
+      
+      int pin = (id == "1") ? pinPompa : pinKipas;
+      int val = (state == "1") ? HIGH : LOW;
+      
+      digitalWrite(pin, val);
+      
+      server.send(200, "text/plain", "OK");
+      Serial.println("Perintah Aktuator diterima: " + id + " -> " + state);
+    } else {
+      server.send(400, "text/plain", "Bad Request: Parameter kurang lengkap");
+    }
+  });
+
+  server.begin();
+  Serial.println("Web Server Berjalan!");
+}
+
+void loop() {
+  // Selalu dengarkan request dari browser
+  server.handleClient(); 
+
+  // Timer untuk mengirim data ke ThingSpeak setiap 15 detik
+  if ((millis() - lastTime) > timerDelay) {
+    
+    // 1. Baca data dari DHT21
+    float suhu = dht.readTemperature();
+    float kelUdara = dht.readHumidity();
+
+    // 2. Baca data dari Sensor Kelembaban Tanah
+    // Nilai analog ESP32 adalah 0 - 4095. 
+    // Kita petakan (map) menjadi persentase (0-100%).
+    // Catatan: Kalibrasi angka 4095 (Kering) dan 0 (Basah) sesuai kondisi fisik sensor Anda.
+    int nilaiAnalogTanah = analogRead(pinSoil);
+    float kelTanah = map(nilaiAnalogTanah, 4095, 0, 0, 100); 
+
+    // Validasi apakah sensor DHT berhasil dibaca
+    if (isnan(suhu) || isnan(kelUdara)) {
+      Serial.println("Gagal membaca dari sensor DHT! Periksa kabel Anda.");
+    } else {
+      // Tampilkan hasil di Serial Monitor
+      Serial.printf("Suhu: %.2f C | Kelembaban Udara: %.2f %% | Kelembaban Tanah: %.2f %%\n", suhu, kelUdara, kelTanah);
+
+      // Set Data untuk dikirim ke field ThingSpeak
+      ThingSpeak.setField(1, suhu);         // Grafik 1
+      ThingSpeak.setField(2, kelUdara);     // Grafik 2
+      ThingSpeak.setField(3, kelTanah);     // Grafik 3
+
+      // Proses kirim Data
+      int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+      if (x == 200) {
+        Serial.println("Data sukses dikirim ke ThingSpeak.");
+      } else {
+        Serial.println("Gagal mengirim ke ThingSpeak. Kode HTTP: " + String(x));
+      }
+    }
+    
+    // Reset timer
+    lastTime = millis();
+  }
+}
