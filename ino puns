@@ -1,0 +1,125 @@
+#include <WiFi.h>
+#include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <HTTPClient.h>
+
+// =================== SETTING THINGSPEAK & WIFI ===================
+const char* ssid = "UGMURO-INET";
+const char* password = "Gepuk15000";
+
+String channelID = "3085795";
+String readAPIKey = "PKB4OSEARF2YTDV7";
+String writeAPIKey = "71DLU7BJX7BV2EUP";
+// =================================================================
+
+#define DHTPIN 18          
+#define DHTTYPE DHT21
+#define MOISTURE_PIN 34    
+
+#define RELAY_KIPAS 25     // Channel 1 Relay
+#define RELAY_POMPA 26     // Channel 2 Relay
+
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+unsigned long lastUpdateTime = 0;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(RELAY_KIPAS, OUTPUT);
+  pinMode(RELAY_POMPA, OUTPUT);
+  
+  // Set kondisi mati di awal (aktif low relay umumnya HIGH = mati)
+  digitalWrite(RELAY_KIPAS, HIGH);
+  digitalWrite(RELAY_POMPA, HIGH);
+
+  dht.begin();
+  Wire.begin();
+  lcd.init();
+  lcd.backlight();
+  
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting Wi-Fi");
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  lcd.clear();
+  lcd.print("IoT Cloud Active");
+  Serial.println("\nWemos Siap Digunakan!");
+  delay(1500);
+}
+
+void loop() {
+  // Melakukan update berkala setiap 20 detik (Aman untuk Cloud ThingSpeak Free Tier)
+  if (millis() - lastUpdateTime > 20000) {
+    lastUpdateTime = millis();
+
+    // 1. Membaca Sensor Fisik
+    float suhuUdara = dht.readTemperature();
+    float kelembabanUdara = dht.readHumidity();
+    
+    int rawAnalog = analogRead(MOISTURE_PIN);
+    int kelembabanTanah = map(rawAnalog, 4095, 1200, 0, 100);
+    if(kelembabanTanah > 100) kelembabanTanah = 100;
+    if(kelembabanTanah < 0) kelembabanTanah = 0;
+
+    if (isnan(suhuUdara)) suhuUdara = 0.0;
+    if (isnan(kelembabanUdara)) kelembabanUdara = 0.0;
+
+    // 2. Kirim Data Sensor (Field 1, 2, 3) ke ThingSpeak Cloud
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      String sendUrl = "http://api.thethingspeak.com/update?api_key=" + writeAPIKey +
+                       "&field1=" + String(suhuUdara, 1) +
+                       "&field2=" + String(kelembabanUdara, 1) +
+                       "&field3=" + String(kelembabanTanah);
+      
+      http.begin(sendUrl);
+      int httpCode = http.GET();
+      http.end();
+      
+      // 3. Baca Kembali Data Kontrol Terbaru (Field 4 & Field 5) dari Cloud ThingSpeak
+      String readUrl = "http://api.thethingspeak.com/channels/" + channelID + "/feeds.json?results=1&api_key=" + readAPIKey;
+      http.begin(readUrl);
+      int readCode = http.GET();
+      
+      if (readCode == 200) {
+        String payload = http.getString();
+        
+        // Parsing sederhana manual untuk efisiensi memori tanpa library JSON besar
+        int idxField4 = payload.indexOf("\"field4\":\"");
+        if(idxField4 != -1) {
+          char f4Value = payload.charAt(idxField4 + 10);
+          if(f4Value == '1') {
+            digitalWrite(RELAY_KIPAS, LOW); // Nyalakan Kipas
+          } else {
+            digitalWrite(RELAY_KIPAS, HIGH); // Matikan Kipas
+          }
+        }
+        
+        int idxField5 = payload.indexOf("\"field5\":\"");
+        if(idxField5 != -1) {
+          char f5Value = payload.charAt(idxField5 + 10);
+          if(f5Value == '1') {
+            digitalWrite(RELAY_POMPA, LOW); // Nyalakan Pompa
+          } else {
+            digitalWrite(RELAY_POMPA, HIGH); // Matikan Pompa
+          }
+        }
+      }
+      http.end();
+    }
+
+    // 4. Perbarui Tampilan Informasi Lokal ke LCD 16x2
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Suhu: "); lcd.print(suhuUdara, 1); lcd.print(" C");
+    lcd.setCursor(0, 1);
+    lcd.print("Mst: "); lcd.print(kelembabanTanah); lcd.print("%");
+  }
+}
