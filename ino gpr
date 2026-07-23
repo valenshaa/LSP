@@ -1,0 +1,212 @@
+#include <WiFi.h>
+#include <ThingSpeak.h>
+#include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+//================================
+// WIFI
+//================================
+const char* ssid = "UGMURO-INET";
+const char* password = "Gepuk15000";
+
+//================================
+// THINGSPEAK
+//================================
+unsigned long channelID = 3399749;
+const char* writeAPIKey = "OHYTD7AW0RVC81F8";
+
+WiFiClient client;
+
+//================================
+// DHT21
+//================================
+#define DHTPIN 4
+#define DHTTYPE DHT21
+DHT dht(DHTPIN, DHTTYPE);
+
+//================================
+// SOIL MOISTURE
+//================================
+#define SOIL_PIN 34
+
+//================================
+// RELAY
+//================================
+#define RELAY1 26   // Pompa
+#define RELAY2 27   // Kipas
+
+//================================
+// LCD
+//================================
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+//================================
+// TIMER THINGSPEAK
+//================================
+unsigned long lastThingSpeak = 0;
+const long thingSpeakInterval = 20000;
+
+void connectWiFi()
+{
+  WiFi.begin(ssid, password);
+
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Connecting WiFi");
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("WiFi Connected");
+  delay(1000);
+}
+
+void setup()
+{
+  Serial.begin(115200);
+
+  pinMode(RELAY1, OUTPUT);
+  pinMode(RELAY2, OUTPUT);
+
+  // Relay OFF (ACTIVE HIGH)
+  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY2, LOW);
+
+  dht.begin();
+
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0,0);
+  lcd.print("SMART FARM IoT");
+
+  connectWiFi();
+
+  ThingSpeak.begin(client);
+}
+
+void loop()
+{
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    connectWiFi();
+  }
+
+  float suhuC = dht.readTemperature();
+  float humidity = dht.readHumidity();
+
+  if (isnan(suhuC) || isnan(humidity))
+  {
+    Serial.println("DHT Error");
+    delay(1000);
+    return;
+  }
+
+  int soilRaw = analogRead(SOIL_PIN);
+
+  int soilPercent = map(soilRaw, 4095, 0, 0, 100);
+  soilPercent = constrain(soilPercent, 0, 100);
+
+  //================================
+  // POMPA
+  // Soil > 40 = ON
+  //================================
+  if (soilPercent > 40)
+  {
+    digitalWrite(RELAY1, HIGH);
+  }
+  else
+  {
+    digitalWrite(RELAY1, LOW);
+  }
+
+  //================================
+  // KIPAS
+  // Suhu > 30 = ON
+  //================================
+  if (suhuC > 30)
+  {
+    digitalWrite(RELAY2, HIGH);
+  }
+  else
+  {
+    digitalWrite(RELAY2, LOW);
+  }
+
+  bool pompa = (digitalRead(RELAY1) == HIGH);
+  bool kipas = (digitalRead(RELAY2) == HIGH);
+
+  //================================
+  // LCD
+  //================================
+  lcd.clear();
+
+  lcd.setCursor(0,0);
+  lcd.print("P:");
+  lcd.print(pompa ? "ON " : "OFF");
+
+  lcd.print(" F:");
+  lcd.print(kipas ? "ON" : "OFF");
+
+  lcd.setCursor(0,1);
+  lcd.print("Temp:");
+  lcd.print(suhuC,1);
+  lcd.print((char)223);
+  lcd.print("C");
+
+  lcd.setCursor(0,2);
+  lcd.print("Hum :");
+  lcd.print(humidity,1);
+  lcd.print("%");
+
+  lcd.setCursor(0,3);
+  lcd.print("Soil:");
+  lcd.print(soilPercent);
+  lcd.print("%");
+
+  //================================
+  // SERIAL
+  //================================
+  Serial.println("====================");
+  Serial.print("Temp : ");
+  Serial.println(suhuC);
+
+  Serial.print("Humidity : ");
+  Serial.println(humidity);
+
+  Serial.print("Soil : ");
+  Serial.println(soilPercent);
+
+  Serial.print("Pompa : ");
+  Serial.println(pompa ? "ON" : "OFF");
+
+  Serial.print("Kipas : ");
+  Serial.println(kipas ? "ON" : "OFF");
+
+  //================================
+  // THINGSPEAK
+  //================================
+  if (millis() - lastThingSpeak >= thingSpeakInterval)
+  {
+    ThingSpeak.setField(1, suhuC);
+    ThingSpeak.setField(2, humidity);
+    ThingSpeak.setField(3, soilPercent);
+    ThingSpeak.setField(4, pompa ? 1 : 0);
+    ThingSpeak.setField(5, kipas ? 1 : 0);
+
+    int statusCode = ThingSpeak.writeFields(channelID, writeAPIKey);
+
+    Serial.print("ThingSpeak Status : ");
+    Serial.println(statusCode);
+
+    lastThingSpeak = millis();
+  }
+
+  delay(2000);
+}
