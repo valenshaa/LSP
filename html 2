@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Greenhouse Dashboard</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <h1>🌿 Smart Greenhouse Dashboard</h1>
+    <p>Monitoring System - ThingSpeak IoT</p>
+
+    <div id="status-bar" class="status-offline">
+      Connecting...
+    </div>
+  </header>
+
+  <!-- CARD ATAS -->
+  <div class="top-cards">
+
+    <div class="card">
+      <h3>🌡 Suhu</h3>
+      <div class="big-value" id="temp">--°C</div>
+    </div>
+
+    <div class="card">
+      <h3>💧 Kelembaban</h3>
+      <div class="big-value" id="humidity">--%</div>
+    </div>
+
+    <div class="card">
+      <h3>Status</h3>
+      <div id="system-status" class="online">
+        ONLINE
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BAGIAN TENGAH -->
+  <div class="middle">
+
+    <!-- GAUGE -->
+    <div class="card gauge-card">
+
+      <h3>Kelembaban Tanah</h3>
+
+      <div class="gauge">
+
+        <svg viewBox="0 0 200 120">
+
+          <!-- Background -->
+          <path
+            d="M20 100 A80 80 0 0 1 180 100"
+            class="gauge-bg"/>
+
+          <!-- Progress -->
+          <path
+            d="M20 100 A80 80 0 0 1 180 100"
+            class="gauge-fill"
+            id="gaugeFill"/>
+
+        </svg>
+
+        <div class="gauge-value">
+          <span id="soil">0%</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- GRAFIK -->
+    <div class="card chart-card">
+
+      <h3>Suhu & Kelembaban Udara</h3>
+
+      <canvas id="sensorChart"></canvas>
+
+    </div>
+
+  </div>
+
+  <!-- CARD BAWAH -->
+  <div class="bottom-cards">
+
+    <div class="card status-card">
+
+      <h3>🚰 Pompa</h3>
+
+      <div class="status-badge" id="pompa-status">
+        OFF
+      </div>
+
+    </div>
+
+    <div class="card status-card">
+
+      <h3>🌀 Kipas</h3>
+
+      <div class="status-badge" id="kipas-status">
+        OFF
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
