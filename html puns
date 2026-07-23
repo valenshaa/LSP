@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCU Agrotech - Panel Kontrol ThingSpeak</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>MCU AGROTECH CONTROL PANEL</h1>
+        <p>Sistem Otomatisasi & Monitoring Kebun Pintar Berbasis Cloud IoT</p>
+    </header>
+
+    <div class="card config-card">
+        <div class="card-title">Konfigurasi API ThingSpeak Cloud</div>
+        <div class="form-group">
+            <input type="text" id="channelID" placeholder="Channel ID">
+            <input type="text" id="readAPIKey" placeholder="Read API Key">
+            <input type="text" id="writeAPIKey" placeholder="Write API Key">
+            <button class="btn btn-on" style="flex: none; width: auto; padding: 10px 20px;" onclick="initThingSpeak()">Hubungkan</button>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">Kelembaban Tanah (Field 3)</div>
+            <div class="gauge-container">
+                <div class="gauge-body"></div>
+                <div class="gauge-fill" id="gaugeMoisture"></div>
+                <div class="gauge-value" id="valMoisture">0%</div>
+            </div>
+            <p style="text-align:center; font-size: 12px; color: #777; margin-bottom: 20px;">Ambang Batas Pompa: &lt; 30%</p>
+            
+            <div class="card-title" style="border-top: 1px solid #eee; padding-top: 15px;">Aksi Kendali Aktuator</div>
+            <div class="btn-group">
+                <button class="btn btn-off" id="btnKipas" onclick="toggleRelay('kipas')">Kipas: OFF</button>
+                <button class="btn btn-off" id="btnPompa" onclick="toggleRelay('pompa')">Pompa: OFF</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Grafik Suhu DHT21 (Field 1)</div>
+            <div class="chart-container">
+                <iframe id="tsChart" width="100%" height="250" style="border: 1px solid #cccccc;" 
+                        src="https://thingspeak.mathworks.com/channels/3085795/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=10&title=Suhu+Udara&type=line&api_key=PKB4OSEARF2YTDV7">
+                </iframe>
+            </div>
+            <p style="text-align:center; font-size: 13px; color: #555; margin-top: 15px;">
+                Kelembaban Udara Sekitar (Field 2): <strong><span id="valHumid">0</span>%</strong>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
