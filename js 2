@@ -1,0 +1,270 @@
+//=====================================================
+// THINGSPEAK CONFIG
+//=====================================================
+const CHANNEL_ID = "3399749";
+
+// Kosongkan jika Channel Public
+const READ_API_KEY = "";
+
+// URL ThingSpeak
+const URL = READ_API_KEY === ""
+  ? `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=20`
+  : `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=20`;
+
+
+//=====================================================
+// HTML ELEMENT
+//=====================================================
+const tempEl = document.getElementById("temp");
+const humEl = document.getElementById("humidity");
+const soilEl = document.getElementById("soil");
+
+const pompaEl = document.getElementById("pompa-status");
+const kipasEl = document.getElementById("kipas-status");
+
+const statusBar = document.getElementById("status-bar");
+const systemStatus = document.getElementById("system-status");
+
+const gaugeFill = document.getElementById("gaugeFill");
+
+
+//=====================================================
+// CHART
+//=====================================================
+const ctx = document.getElementById("sensorChart").getContext("2d");
+
+const sensorChart = new Chart(ctx, {
+
+    type: "line",
+
+    data: {
+
+        labels: [],
+
+        datasets: [
+
+            {
+                label: "Suhu (°C)",
+                data: [],
+                borderColor: "#FFC107",
+                backgroundColor: "transparent",
+                borderWidth: 3,
+                tension: 0.35
+            },
+
+            {
+                label: "Kelembaban (%)",
+                data: [],
+                borderColor: "#00D4FF",
+                backgroundColor: "transparent",
+                borderWidth: 3,
+                tension: 0.35
+            }
+
+        ]
+    },
+
+    options: {
+
+        responsive: true,
+
+        plugins: {
+
+            legend: {
+
+                labels: {
+                    color: "white"
+                }
+
+            }
+
+        },
+
+        scales: {
+
+            x: {
+
+                ticks: {
+                    color: "#ccc"
+                },
+
+                grid: {
+                    color: "#2d3748"
+                }
+
+            },
+
+            y: {
+
+                min: 0,
+                max: 100,
+
+                ticks: {
+                    color: "#ccc"
+                },
+
+                grid: {
+                    color: "#2d3748"
+                }
+
+            }
+
+        }
+
+    }
+
+});
+
+
+//=====================================================
+// UPDATE GAUGE
+//=====================================================
+function updateGauge(value){
+
+    const length = 252;
+
+    const progress = length - (value/100)*length;
+
+    gaugeFill.style.strokeDasharray = length;
+    gaugeFill.style.strokeDashoffset = progress;
+
+}
+
+
+//=====================================================
+// FETCH DATA
+//=====================================================
+async function fetchData(){
+
+    try{
+
+        const response = await fetch(URL);
+
+        const data = await response.json();
+
+        const feeds = data.feeds;
+
+        if(feeds.length==0)
+            return;
+
+
+        //------------------------------------------------
+
+        const last = feeds[feeds.length-1];
+
+        const suhu = parseFloat(last.field1 || 0);
+
+        const hum = parseFloat(last.field2 || 0);
+
+        const soil = parseFloat(last.field3 || 0);
+
+        const pompa = parseInt(last.field4 || 0);
+
+        const kipas = parseInt(last.field5 || 0);
+
+
+        //------------------------------------------------
+        // CARD
+        //------------------------------------------------
+
+        tempEl.innerHTML = suhu.toFixed(1)+"°C";
+
+        humEl.innerHTML = hum.toFixed(1)+"%";
+
+        soilEl.innerHTML = Math.round(soil)+"%";
+
+
+        //------------------------------------------------
+        // STATUS
+        //------------------------------------------------
+
+        if(pompa){
+
+            pompaEl.innerHTML="ON";
+
+            pompaEl.classList.add("on");
+
+        }
+
+        else{
+
+            pompaEl.innerHTML="OFF";
+
+            pompaEl.classList.remove("on");
+
+        }
+
+
+        if(kipas){
+
+            kipasEl.innerHTML="ON";
+
+            kipasEl.classList.add("on");
+
+        }
+
+        else{
+
+            kipasEl.innerHTML="OFF";
+
+            kipasEl.classList.remove("on");
+
+        }
+
+
+        //------------------------------------------------
+        // ONLINE
+        //------------------------------------------------
+
+        statusBar.innerHTML="● LIVE DATA";
+
+        statusBar.className="status-online";
+
+        systemStatus.innerHTML="ONLINE";
+
+
+        //------------------------------------------------
+        // GAUGE
+        //------------------------------------------------
+
+        updateGauge(soil);
+
+
+        //------------------------------------------------
+        // CHART
+        //------------------------------------------------
+
+        sensorChart.data.labels =
+        feeds.map(f=>new Date(f.created_at).toLocaleTimeString());
+
+        sensorChart.data.datasets[0].data =
+        feeds.map(f=>parseFloat(f.field1||0));
+
+        sensorChart.data.datasets[1].data =
+        feeds.map(f=>parseFloat(f.field2||0));
+
+        sensorChart.update();
+
+
+    }
+
+    catch(err){
+
+        console.log(err);
+
+        statusBar.innerHTML="OFFLINE";
+
+        statusBar.className="status-offline";
+
+        systemStatus.innerHTML="OFFLINE";
+
+    }
+
+}
+
+
+//=====================================================
+
+fetchData();
+
+setInterval(fetchData,20000);
