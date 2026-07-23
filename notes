@@ -1,0 +1,16 @@
+rangkai sesuai skematik
+namain
+error check (inspect-electrical rules checker)
+Assign footprint (tools-Assign footprint) contoh: resistor_tht
+masuk pcb editor
+import skematik (tools-update pcb from schematic)
+routing (hubungin semua jalur kuning smpe ilang)
+DRC (inspect-design rules check)
+3d viewer (view-3d viewer)
+export pdf (file-print/plot pdf)
+klik file-plot pilih gerber
+generate drill (kalau pcb berlubang)
+FLATCAM (gerber-open-drill file)
+generate toolpath (selected-isolation routing-generate)
+klik generate cnc job hasilnya G-code trs export G-code
+CANDLE (Load-Gcode)
