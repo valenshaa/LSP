@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Farming Dashboard - Ujikom</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js untuk grafik real-time -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🌱 Smart Farming Dashboard</h1>
+      <p>Monitoring System - ThingSpeak IoT Integration</p>
+      <div id="status-bar" class="status-offline">Menghubungkan ke ThingSpeak...</div>
+    </header>
+
+    <!-- KARTU INDIKATOR -->
+    <div class="card-grid">
+      <div class="card">
+        <h3>🌡️ Suhu Udara</h3>
+        <div class="value" id="temp">-- °C</div>
+      </div>
+      <div class="card">
+        <h3>💧 Kelembapan Udara</h3>
+        <div class="value" id="humidity">-- %</div>
+      </div>
+      <div class="card">
+        <h3>🪴 Kelembapan Tanah</h3>
+        <div class="value" id="soil">-- %</div>
+      </div>
+      <div class="card">
+        <h3>🚰 Status Pompa</h3>
+        <div class="status-badge" id="pompa-status">OFF</div>
+      </div>
+      <div class="card">
+        <h3>🌀 Status Kipas</h3>
+        <div class="status-badge" id="kipas-status">OFF</div>
+      </div>
+    </div>
+
+    <!-- GRAFIK REAL-TIME -->
+    <div class="chart-container">
+      <h3>📈 Grafik Sensor Real-Time</h3>
+      <canvas id="sensorChart"></canvas>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
