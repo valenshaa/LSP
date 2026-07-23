@@ -1,0 +1,22 @@
+//==========================================
+// UPDATE SOIL GAUGE
+//==========================================
+function updateGauge(value){
+
+    value = Math.max(0, Math.min(100, value));
+
+    const gauge = document.getElementById("gaugeFill");
+
+    // Panjang path setengah lingkaran
+    const circumference = 251.2;
+
+    gauge.style.strokeDasharray = circumference;
+
+    // Hitung progress
+    const offset = circumference - (value / 100) * circumference;
+
+    gauge.style.strokeDashoffset = offset;
+
+    // Update angka
+    soilEl.innerHTML = Math.round(value) + "%";
+}
