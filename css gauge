@@ -1,0 +1,17 @@
+.gauge-fill{
+
+    fill:none;
+
+    stroke:#00d4ff;
+
+    stroke-width:18;
+
+    stroke-linecap:round;
+
+    stroke-dasharray:251.2;
+
+    stroke-dashoffset:251.2;
+
+    transition:stroke-dashoffset .8s ease;
+
+}
