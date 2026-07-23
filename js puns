@@ -1,0 +1,123 @@
+// script.js
+
+// --- ISI DETAIL PARAMETER THINGSPEAK ANDA DI SINI ---
+let channelID  = "3085795";
+let readAPIKey  = "PKB4OSEARF2YTDV7";
+let writeAPIKey = "71DLU7BJX7BV2EUP";
+
+let currentKipasState = 0;
+let currentPompaState = 0;
+
+function initThingSpeak() {
+    const cID  = document.getElementById('channelID').value;
+    const rKey = document.getElementById('readAPIKey').value;
+    const wKey = document.getElementById('writeAPIKey').value;
+    if (cID)  channelID   = cID;
+    if (rKey) readAPIKey  = rKey;
+    if (wKey) writeAPIKey = wKey;
+
+    // Perbarui iframe chart suhu saat user klik Hubungkan
+    const iframe = document.getElementById('tsChart');
+    if (iframe && channelID) {
+        iframe.src = `https://thingspeak.mathworks.com/channels/${channelID}/charts/1?bgcolor=%23ffffff&color=%238A5F41&dynamic=true&results=10&title=Suhu+Udara&type=line&api_key=${readAPIKey}`;
+    }
+
+    alert("Konfigurasi API ThingSpeak berhasil dimuat!");
+    fetchDataFromThingSpeak();
+}
+
+window.onload = function () {
+    document.getElementById('channelID').value  = channelID;
+    document.getElementById('readAPIKey').value  = readAPIKey;
+    document.getElementById('writeAPIKey').value = writeAPIKey;
+
+    // FIX: iframe langsung pakai api_key di URL supaya tidak perlu login ThingSpeak
+    const iframe = document.getElementById('tsChart');
+    if (iframe && channelID) {
+        iframe.src = `https://thingspeak.mathworks.com/channels/${channelID}/charts/1?bgcolor=%23ffffff&color=%238A5F41&dynamic=true&results=10&title=Suhu+Udara&type=line&api_key=${readAPIKey}`;
+    }
+
+    fetchDataFromThingSpeak();
+};
+
+function updateGauge(value) {
+    const val  = parseFloat(value) || 0;
+    const fill = document.getElementById('gaugeMoisture');
+    document.getElementById('valMoisture').innerText = val.toFixed(0) + '%';
+    const rotation = (val * 1.8) - 45;
+    fill.style.transform = `rotate(${rotation}deg)`;
+}
+
+function toggleRelay(device) {
+    if (!writeAPIKey || writeAPIKey === "WRITE_API_KEY_ANDA") {
+        alert("Silakan isi Write API Key Anda terlebih dahulu!");
+        return;
+    }
+
+    if (device === 'kipas') {
+        currentKipasState = currentKipasState === 1 ? 0 : 1;
+    } else if (device === 'pompa') {
+        currentPompaState = currentPompaState === 1 ? 0 : 1;
+    }
+
+    // Kirim status kendali ke Field 4 dan Field 5
+    const url = `https://api.thingspeak.com/update?api_key=${writeAPIKey}&field4=${currentKipasState}&field5=${currentPompaState}`;
+
+    fetch(url)
+        .then(res => res.text())
+        .then(data => {
+            console.log("Kontrol terkirim ke ThingSpeak. Respon ID:", data);
+            updateButtonUI();
+        })
+        .catch(err => console.error("Gagal mengirim data kendali:", err));
+}
+
+function updateButtonUI() {
+    document.getElementById('btnKipas').className  = currentKipasState ? "btn btn-on" : "btn btn-off";
+    document.getElementById('btnKipas').innerText   = currentKipasState ? "Kipas: ON"  : "Kipas: OFF";
+    document.getElementById('btnPompa').className  = currentPompaState ? "btn btn-on" : "btn btn-off";
+    document.getElementById('btnPompa').innerText   = currentPompaState ? "Pompa: ON"  : "Pompa: OFF";
+}
+
+// Fungsi utama ambil data dari ThingSpeak feed API
+function fetchDataFromThingSpeak() {
+    // FIX: kondisi guard sebelumnya → channelID === "3085795" selalu true
+    //      karena channelID yang di-hardcode memang "3085795", jadi fetch
+    //      tidak pernah jalan sama sekali. Kondisi itu dihapus.
+    if (!channelID || !readAPIKey) return;
+
+    const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?results=1&api_key=${readAPIKey}`;
+
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (data.feeds && data.feeds.length > 0) {
+                const feed = data.feeds[0];
+
+                // Field 1 – Suhu Udara (DHT21)
+                if (feed.field1 !== null && feed.field1 !== undefined) {
+                    const elTemp = document.getElementById('valTemp');
+                    if (elTemp) elTemp.innerText = parseFloat(feed.field1).toFixed(1);
+                }
+
+                // Field 2 – Kelembaban Udara (DHT21)
+                if (feed.field2 !== null && feed.field2 !== undefined) {
+                    document.getElementById('valHumid').innerText = parseFloat(feed.field2).toFixed(0);
+                }
+
+                // Field 3 – Kelembaban Tanah
+                if (feed.field3 !== null && feed.field3 !== undefined) {
+                    updateGauge(feed.field3);
+                }
+
+                // Field 4 & 5 – Sinkronisasi status tombol aktuator
+                if (feed.field4 !== null && feed.field4 !== undefined) currentKipasState = parseInt(feed.field4) || 0;
+                if (feed.field5 !== null && feed.field5 !== undefined) currentPompaState = parseInt(feed.field5) || 0;
+                updateButtonUI();
+            }
+        })
+        .catch(err => console.error("Koneksi API ThingSpeak Error:", err));
+}
+
+// Sinkronisasi data setiap 15 detik
+setInterval(fetchDataFromThingSpeak, 15000);
